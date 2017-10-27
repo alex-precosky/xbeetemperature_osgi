@@ -246,6 +246,7 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
               }
           }
         } // if m_commIs != null
+        s_logger.info("doSerial() is exiting for some reason");
     } // doSerial()
     
     
