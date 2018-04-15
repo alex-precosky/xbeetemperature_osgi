@@ -24,6 +24,6 @@ Select the project and click Finish.
 
 ## Deployment
 
-The .jar file bundle of the project needs to be built first, as above.  Then, find the .dpp file in the Eclipse project structurm, 
+The .jar file bundle of the project needs to be built first, as above.  Then, find the .dpp file in the Eclipse project structure, 
 under resources/dp.  Open it and it will update its configuration to use the newly built .jar file.  Right click on the .dpp file
 and choose Quick Build. 
