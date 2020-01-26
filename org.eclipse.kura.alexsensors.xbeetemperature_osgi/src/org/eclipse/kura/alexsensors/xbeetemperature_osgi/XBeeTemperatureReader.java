@@ -105,9 +105,7 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
     
     public void updated(Map<String, Object> properties) {
     	s_logger.info("Updating XBeeTemperatureReader...");
-    	
-        this.m_properties = properties;
-        
+    	        
         // log the new properties
         if(properties != null && !properties.isEmpty()) {
             Iterator<Entry<String, Object>> it = properties.entrySet().iterator();
@@ -140,6 +138,7 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
             closePort();
 
             //store the properties
+        	m_properties = new HashMap<String, Object>();
             m_properties.clear();
             m_properties.putAll(properties);
 
