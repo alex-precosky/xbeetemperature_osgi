@@ -8,7 +8,8 @@
 	        name="serial.device"
 	        type="String"
 	        cardinality="0"
-	        required="false"
+	        required="true"
+	        default="/dev/ttyUSB1"
 	        description="Name of the serial device (e.g. /dev/ttyS0, /dev/ttyACM0, /dev/ttyUSB0)."/>
 	
 	    <AD id="serial.baudrate"
