@@ -297,8 +297,8 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
 			byte[] tempBytes = tempStr.getBytes();
 			byte[] voltageBytes = batVoltageStr.getBytes();
 		
-			m_cloudClient.publish(temptopic, tempBytes, 0, true, 1);
-			m_cloudClient.publish(batTopic, voltageBytes, 0, true, 1);
+			m_cloudClient.publish(temptopic, tempBytes, 0, false, 1);
+			m_cloudClient.publish(batTopic, voltageBytes, 0, false, 1);
 		}
 		catch(Exception e)
 		{
