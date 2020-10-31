@@ -3,13 +3,21 @@ package org.eclipse.kura.alexsensors.xbeetemperature_osgi;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import static java.util.Objects.nonNull;
+
 import java.io.IOException;
 import java.io.InputStream;
 import org.eclipse.kura.configuration.ConfigurableComponent;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+
+import java.util.concurrent.Executors;
+import java.util.Date;
 import java.util.HashMap;
 import org.eclipse.kura.comm.CommURI;
 import org.eclipse.kura.comm.CommConnection;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Future;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.ComponentException;
@@ -17,28 +25,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.osgi.service.io.ConnectionFactory;
 
-import org.eclipse.kura.cloud.CloudService;
-import org.eclipse.kura.cloud.CloudClient;
-import org.eclipse.kura.cloud.CloudClientListener;
+import org.eclipse.kura.cloudconnection.listener.CloudConnectionListener;
+import org.eclipse.kura.cloudconnection.listener.CloudDeliveryListener;
+import org.eclipse.kura.cloudconnection.message.KuraMessage;
+import org.eclipse.kura.cloudconnection.publisher.CloudPublisher;
 import org.eclipse.kura.message.KuraPayload;
 import org.eclipse.kura.alexsensors.xbeetemperature_osgi.xbeetemperature_sensor_reading;
 
 
-public class XBeeTemperatureReader implements ConfigurableComponent, CloudClientListener {
+public class XBeeTemperatureReader implements ConfigurableComponent, CloudConnectionListener, CloudDeliveryListener {
 
 	private static final Logger s_logger = LoggerFactory.getLogger(XBeeTemperatureReader.class);
 	private static final String APP_ID = "org.eclipse.kura.alexsensors.XBeeTemperatureReader";
 	private Map<String, Object> m_properties;
-	private ScheduledThreadPoolExecutor m_worker;
+	private ScheduledExecutorService m_worker;
 	private Future<?> m_handle;
 	private InputStream m_commIs;
 	
 	private ConnectionFactory m_connectionFactory;
 	private CommConnection m_commConnection;
+
+	private CloudPublisher cloudPublisher;
 	
-	private CloudService m_cloudService;
-	private CloudClient m_cloudClient;
-		
 	
 	private static final String SERIAL_DEVICE_PROP_NAME= "serial.device";
 	private static final String SERIAL_BAUDRATE_PROP_NAME= "serial.baudrate";
@@ -58,38 +66,26 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
 	    this.m_connectionFactory = null;
 	  }
 
-	  public void setCloudService(CloudService cloudService) {
-		    this.m_cloudService = cloudService;
-		    s_logger.info("Cloud service set!");
-		  }
+	  public void setCloudPublisher(CloudPublisher cloudPublisher) {
+	      this.cloudPublisher = cloudPublisher;
+	      this.cloudPublisher.registerCloudConnectionListener(XBeeTemperatureReader.this);
+	      this.cloudPublisher.registerCloudDeliveryListener(XBeeTemperatureReader.this);
+	      s_logger.info("Cloud publisher set!");
+	  }
 
-	  public void unsetCloudService(ConnectionFactory connectionFactory) {
-	    this.m_cloudService = null;
+	  public void unsetCloudPublisher(CloudPublisher cloudPublisher) {
+	      this.cloudPublisher.unregisterCloudConnectionListener(XBeeTemperatureReader.this);
+	      this.cloudPublisher.unregisterCloudDeliveryListener(XBeeTemperatureReader.this);
+	      this.cloudPublisher = null;
+		  s_logger.info("Cloud publisher unset!");
 	  }
 	  
-	
     protected void activate(ComponentContext componentContext,  Map<String,Object> properties) {
     	s_logger.info("Starting " + APP_ID);
     	
-    	m_worker = new ScheduledThreadPoolExecutor(1);
-    	m_properties = new HashMap<String, Object>();
-
-    	try {
-    		s_logger.info("Getting CloudClient for {}...", APP_ID);
-    		if( this.m_cloudService != null )
-    		{
-    			m_cloudClient = m_cloudService.newCloudClient(MQTT_APP_ID);	
- 	   	    	this.m_cloudClient.addCloudClientListener(this);
- 	   	    	doUpdate(properties);
-    		}
-			
-		} catch (Exception e) {
-            s_logger.error("Error during component activation", e);
-            throw new ComponentException(e);
-        }
+        m_worker = Executors.newSingleThreadScheduledExecutor();
     	
-
-    	
+        m_properties = new HashMap<String, Object>();
         s_logger.info("Bundle " + APP_ID + " has started!");
     }
     
@@ -97,9 +93,6 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
     	m_handle.cancel(true);
     	m_worker.shutdownNow();
     	closePort();
-    	
-    	m_cloudClient.release();
-    	
         s_logger.info("Bundle " + APP_ID + " has stopped!");
     }
     
@@ -297,8 +290,34 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
 			byte[] tempBytes = tempStr.getBytes();
 			byte[] voltageBytes = batVoltageStr.getBytes();
 		
-			m_cloudClient.publish(temptopic, tempBytes, 0, false, 1);
-			m_cloudClient.publish(batTopic, voltageBytes, 0, false, 1);
+			KuraPayload payload1 = new KuraPayload();
+			payload1.setTimestamp(new Date());
+			payload1.addMetric(temptopic, tempBytes);
+
+			KuraPayload payload2 = new KuraPayload();
+			payload2.setTimestamp(new Date());
+			payload2.addMetric(temptopic, tempBytes);
+
+	        try {
+	            if (nonNull(this.cloudPublisher)) {
+	                KuraMessage message = new KuraMessage(payload1);
+	                String messageId = this.cloudPublisher.publish(message);
+	                s_logger.info("Published to message: {} with ID: {}", message, messageId);
+	            }
+	        } catch (Exception e) {
+                s_logger.error("Cannot publish: ", e);
+	        }
+
+	        try {
+	            if (nonNull(this.cloudPublisher)) {
+	                KuraMessage message = new KuraMessage(payload2);
+	                String messageId = this.cloudPublisher.publish(message);
+	                s_logger.info("Published to message: {} with ID: {}", message, messageId);
+	            }
+	        } catch (Exception e) {
+                s_logger.error("Cannot publish: ", e);
+	        }
+
 		}
 		catch(Exception e)
 		{
@@ -316,28 +335,17 @@ public class XBeeTemperatureReader implements ConfigurableComponent, CloudClient
 	
 	  
 	   @Override
-	    public  void onConnectionLost() {
-	        s_logger.warn("Connection lost!");
-	    }
+	   public  void onConnectionLost() {
+	       s_logger.warn("Connection lost!");
+	   }
 	   
-	   @Override
-	    public  void onControlMessageArrived(String deviceId, String appTopic, KuraPayload msg, int qos, boolean retain) {
-	        s_logger.info("Control message arrived on assetId: {} and semantic topic: {}", deviceId, appTopic);
+	    @Override
+	    public void onDisconnected() {
+            s_logger.warn("On disconnected");
 	    }
 
 	    @Override
-	    public  void onMessageArrived(String deviceId, String appTopic, KuraPayload msg, int qos, boolean retain) {
-	        s_logger.info("Message arrived on assetId: {} and semantic topic: {}", deviceId, appTopic);
+	    public void onMessageConfirmed(String messageId) {
+            s_logger.info("Confirmed message with id: {}", messageId);
 	    }
-
-	    @Override
-	    public  void onMessagePublished(int messageId, String appTopic) {
-	        s_logger.info("Published message with ID: {} on application topic: {}", messageId, appTopic);
-	    }
-
-	    @Override
-	    public  void onMessageConfirmed(int messageId, String appTopic) {
-	        s_logger.info("Confirmed message with ID: {} on application topic: {}", messageId, appTopic);
-	    }
-	    
 }
