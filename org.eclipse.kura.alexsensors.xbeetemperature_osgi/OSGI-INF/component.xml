@@ -1,17 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scr:component xmlns:scr="http://www.osgi.org/xmlns/scr/v1.1.0" activate="activate" configuration-policy="require" deactivate="deactivate" enabled="true" immediate="true" modified="updated" name="org.eclipse.kura.alexsensors.xbeetemperature_osgi.XBeeTemperatureReader">
+<scr:component xmlns:scr="http://www.osgi.org/xmlns/scr/v1.1.0" 
+	activate="activate" 
+	deactivate="deactivate" 
+	enabled="true" 
+	immediate="true" 
+	modified="updated" 
+	name="org.eclipse.kura.alexsensors.xbeetemperature_osgi.XBeeTemperatureReader">
 	
    <implementation class="org.eclipse.kura.alexsensors.xbeetemperature_osgi.XBeeTemperatureReader"/>
    <service>
       <provide interface="org.eclipse.kura.configuration.ConfigurableComponent"/>
    </service>
-
-   <reference name="CloudPublisher"
-           policy="dynamic"
-           bind="setCloudPublisher"
-           unbind="unsetCloudPublisher"
-           cardinality="0..1"
-           interface="org.eclipse.kura.cloudconnection.publisher.CloudPublisher"/>
+    
+    <reference bind="setConnectionFactory" cardinality="1..1"
+    interface="org.osgi.service.io.ConnectionFactory" name="ConnectionFactory"
+    policy="static" unbind="unsetConnectionFactory" />
+    
+    <reference name="CloudService"
+           policy="static"
+           bind="setCloudService"
+           unbind="unsetCloudService"
+           cardinality="1..1"
+           interface="org.eclipse.kura.cloud.CloudService"
+           target="(kura.service.pid=org.eclipse.kura.cloud.CloudService)"/>
     
    <property name="service.pid" type="String" value="org.eclipse.kura.alexsensors.xbeetemperature_osgi.XBeeTemperatureReader"/>
 </scr:component>
